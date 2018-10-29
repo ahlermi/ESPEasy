@@ -1,3 +1,4 @@
+#ifdef USES_P052
 //#######################################################################################################
 //############################# Plugin 052: Senseair CO2 Sensors ########################################
 //#######################################################################################################
@@ -64,21 +65,24 @@ boolean Plugin_052(byte function, struct EventStruct *event, String& string)
 
       case PLUGIN_WRITE:
           {
-            String tmpString = string;
-
-      			String cmd = parseString(tmpString, 1);
-      			String param1 = parseString(tmpString, 2);
-
+      			String cmd = parseString(string, 1);
+      			String param1 = parseString(string, 2);
 
             if (cmd.equalsIgnoreCase(F("senseair_setrelay")))
             {
-              if (param1.toInt() == 0 || param1.toInt() == 1 || param1.toInt() == -1) {
-                Plugin_052_setRelayStatus(param1.toInt());
-                addLog(LOG_LEVEL_INFO, String(F("Senseair command: relay=")) + param1);
+              int par1;
+              if (validIntFromString(param1, par1)) {
+                if (par1 == 0 || par1 == 1 || par1 == -1) {
+                  Plugin_052_setRelayStatus(par1);
+                  addLog(LOG_LEVEL_INFO, String(F("Senseair command: relay=")) + param1);
+                }
               }
               success = true;
             }
 
+            /*
+            // ABC functionality disabled for now, due to a bug in the firmware.
+            // See https://github.com/letscontrolit/ESPEasy/issues/759
             if (cmd.equalsIgnoreCase(F("senseair_setABCperiod")))
             {
               if (param1.toInt() >= 0) {
@@ -87,6 +91,7 @@ boolean Plugin_052(byte function, struct EventStruct *event, String& string)
               }
               success = true;
             }
+            */
 
             break;
           }
@@ -94,13 +99,17 @@ boolean Plugin_052(byte function, struct EventStruct *event, String& string)
     case PLUGIN_WEBFORM_LOAD:
       {
           byte choiceSensor = Settings.TaskDevicePluginConfig[event->TaskIndex][0];
-          byte choiceABCperiod = Settings.TaskDevicePluginConfig[event->TaskIndex][1];
-          
+
           String optionsSensor[7] = { F("Error Status"), F("Carbon Dioxide"), F("Temperature"), F("Humidity"), F("Relay Status"), F("Temperature Adjustment"), F("ABC period") };
-          addFormSelector(string, F("Sensor"), F("plugin_052_sensor"), 7, optionsSensor, NULL, choiceSensor);
-          
+          addFormSelector(F("Sensor"), F("plugin_052_sensor"), 7, optionsSensor, NULL, choiceSensor);
+
+          /*
+          // ABC functionality disabled for now, due to a bug in the firmware.
+          // See https://github.com/letscontrolit/ESPEasy/issues/759
+          byte choiceABCperiod = Settings.TaskDevicePluginConfig[event->TaskIndex][1];
           String optionsABCperiod[9] = { F("disable"), F("1 h"), F("12 h"), F("1 day"), F("2 days"), F("4 days"), F("7 days"), F("14 days"), F("30 days") };
-          addFormSelector(string, F("ABC period"), F("plugin_052_ABC_period"), 9, optionsABCperiod, NULL, choiceABCperiod);
+          addFormSelector(F("ABC period"), F("plugin_052_ABC_period"), 9, optionsABCperiod, NULL, choiceABCperiod);
+          */
 
           success = true;
           break;
@@ -109,11 +118,15 @@ boolean Plugin_052(byte function, struct EventStruct *event, String& string)
     case PLUGIN_WEBFORM_SAVE:
       {
         Settings.TaskDevicePluginConfig[event->TaskIndex][0] = getFormItemInt(F("plugin_052_sensor"));
-        Settings.TaskDevicePluginConfig[event->TaskIndex][1] = getFormItemInt(F("plugin_052_ABC_period"));          
-        
+        /*
+        // ABC functionality disabled for now, due to a bug in the firmware.
+        // See https://github.com/letscontrolit/ESPEasy/issues/759
+        Settings.TaskDevicePluginConfig[event->TaskIndex][1] = getFormItemInt(F("plugin_052_ABC_period"));
+        */
+
         success = true;
         break;
-      }      
+      }
 
     case PLUGIN_INIT:
       {
@@ -121,11 +134,15 @@ boolean Plugin_052(byte function, struct EventStruct *event, String& string)
         Plugin_052_SoftSerial = new ESPeasySoftwareSerial(Settings.TaskDevicePin1[event->TaskIndex],
                                                    Settings.TaskDevicePin2[event->TaskIndex]);
 
+        /*
+        // ABC functionality disabled for now, due to a bug in the firmware.
+        // See https://github.com/letscontrolit/ESPEasy/issues/759
         const int periodInHours[9] = {0, 1, 12, (24*1), (24*2), (24*4), (24*7), (24*14), (24*30) };
         byte choiceABCperiod = Settings.TaskDevicePluginConfig[event->TaskIndex][1];
-        
+
         Plugin_052_setABCperiod(periodInHours[choiceABCperiod]);
-        
+        */
+
         success = true;
         break;
       }
@@ -345,13 +362,16 @@ int Plugin_052_readABCperiod(void)
 {
   int period = 0;
   byte frame[8] = {0};
-  
+
   Plugin_052_buildFrame(0xFE, 0x03, 0x001F, 0x0001, frame);
   period = Plugin_052_sendCommand(frame);
-  
+
   return period;
 }
 
+/*
+// ABC functionality disabled for now, due to a bug in the firmware.
+// See https://github.com/letscontrolit/ESPEasy/issues/759
 void Plugin_052_setABCperiod(int period)
 {
   byte frame[8] = {0};
@@ -359,6 +379,7 @@ void Plugin_052_setABCperiod(int period)
   Plugin_052_buildFrame(0xFE, 0x06, 0x001F, period, frame);
   Plugin_052_sendCommand(frame);
 }
+*/
 
 // Compute the MODBUS RTU CRC
 unsigned int Plugin_052_ModRTU_CRC(byte buf[], int len, byte checkSum[2])
@@ -396,3 +417,4 @@ int getBitOfInt(int reg, int pos)
 
   return result;
 }
+#endif // USES_P052

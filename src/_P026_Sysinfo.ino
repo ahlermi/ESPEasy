@@ -1,3 +1,4 @@
+#ifdef USES_P026
 //#######################################################################################################
 //#################################### Plugin 026: System Info ##########################################
 //#######################################################################################################
@@ -40,7 +41,7 @@ boolean Plugin_026(byte function, struct EventStruct *event, String& string)
     case PLUGIN_WEBFORM_LOAD:
       {
         byte choice = Settings.TaskDevicePluginConfig[event->TaskIndex][0];
-        String options[10];
+        String options[11];
         options[0] = F("Uptime");
         options[1] = F("Free RAM");
         options[2] = F("Wifi RSSI");
@@ -51,7 +52,8 @@ boolean Plugin_026(byte function, struct EventStruct *event, String& string)
         options[7] = F("IP 3.Octet");
         options[8] = F("IP 4.Octet");
         options[9] = F("Web activity");
-        addFormSelector(string, F("Indicator"), F("plugin_026"), 10, options, NULL, choice);
+        options[10] = F("Free Stack");
+        addFormSelector(F("Indicator"), F("plugin_026"), 11, options, NULL, choice);
 
         success = true;
         break;
@@ -95,7 +97,7 @@ boolean Plugin_026(byte function, struct EventStruct *event, String& string)
           }
           case 4:
           {
-            value = (100 - (100 * loopCounterLast / loopCounterMax));
+            value = getCPUload();
             break;
           }
           case 5:
@@ -123,6 +125,11 @@ boolean Plugin_026(byte function, struct EventStruct *event, String& string)
             value = (millis()-lastWeb)/1000; // respond in seconds
             break;
           }
+          case 10:
+          {
+            value = getCurrentFreeStack();
+            break;
+          }
         }
         UserVar[event->BaseVarIndex] = value;
         String log = F("SYS  : ");
@@ -134,3 +141,4 @@ boolean Plugin_026(byte function, struct EventStruct *event, String& string)
   }
   return success;
 }
+#endif // USES_P026

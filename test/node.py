@@ -16,13 +16,14 @@ from espcore import *
 class Node():
 
 
-    def __init__(self, config, id):
+    def __init__(self, config, id, skip_power=False):
         self.log=logging.getLogger(id)
         self.log.debug("{type} has ip {ip}".format(id=id, **config))
         self._config=config
         self._id=id
         self._url="http://{ip}/".format(**self._config)
         self._serial_initialized=False
+        self._skip_power=True
 
     def serial_needed(self):
         """call this at least once if you need serial stuff"""
@@ -63,12 +64,21 @@ class Node():
 
     def powercycle(self):
         """powercycle the device"""
+        if self._skip_power:
+            self.log.warning("Skipping power cycle "+self._id)
+            return False
+
+
         self.poweroff()
         self.poweron()
+        return True
 
     def poweroff(self):
         """power off device"""
 
+        if self._skip_power:
+            self.log.warning("Skipping power off "+self._id)
+            return False
 
         #cant yet be done automaticly unfortunatly
         self.log.info("Please power off node "+self._id)
@@ -84,9 +94,14 @@ class Node():
                     del self._serial
 
         self.log.debug("Detected power off")
+        return True
 
     def poweron(self):
         """power on device"""
+
+        if self._skip_power:
+            self.log.warning("Skipping power on"+self._id)
+            return False
 
         self.log.info("Please power on node "+self._id)
 
@@ -100,6 +115,7 @@ class Node():
                 time.sleep(0.1)
 
         self.log.debug("Detected power on")
+        return True
 
     def pingwifi(self, timeout=60):
         """waits until espeasy reponds via wifi"""
@@ -126,15 +142,25 @@ class Node():
 
         self.log.info("Configuring wifi")
 
-        serial_str="wifissid {ssid}\nwifikey {password}\nip {ip}\nsave\nreboot\n".format(ssid=wificonfig.ssid, password=wificonfig.password, ip=self._config['ip'])
+        serial_str="wifissid {ssid}\nwifikey {password}\nip {ip}\nsubnet {subnet}\ngateway {gateway}\nsave\nreboot\n".format(ssid=wificonfig.ssid, password=wificonfig.password, ip=self._config['ip'], subnet=self._config['subnet'], gateway=self._config['gateway'])
         self._serial.write(bytes(serial_str, 'ascii'));
 
         self.pingwifi(timeout=timeout)
 
 
+    def serialcmd(self, command):
+        """send command via serial"""
+
+        self.serial_needed()
+        self.log.debug("Send serial command: "+command)
+        serial_str=command+"\n"
+        self._serial.write(bytes(serial_str, 'ascii'));
+
+
     def build(self):
         """compile binary"""
 
+        self.log.debug("Building...")
         subprocess.check_call(self._config['build_cmd'].format(**self._config), shell=True, cwd='..')
 
 
@@ -143,6 +169,7 @@ class Node():
 
         self.serial_needed()
 
+        self.log.debug("Flashing...")
         subprocess.check_call(self._config['flash_cmd'].format(**self._config), shell=True, cwd='..')
 
         time.sleep(1)
@@ -153,6 +180,7 @@ class Node():
     def serial(self):
         """open serial terminal to esp"""
         self.serial_needed()
+        self.log.debug("Opening serial terminal")
         subprocess.check_call("platformio serialports monitor --baud 115200 --port {port} --echo".format(**self._config), shell=True, cwd='..')
         # print("JA")
         # term=serial.tools.miniterm.Miniterm(self._serial)
@@ -164,6 +192,7 @@ class Node():
     def erase(self):
         """erase flash via serial"""
         self.serial_needed()
+        self.log.debug("Erasing...")
         subprocess.check_call("esptool.py --port {port} -b 1500000  erase_flash".format(**self._config), shell=True, cwd='..')
 
 
@@ -173,18 +202,25 @@ class Node():
         self.flashserial()
         self.serial()
 
+    def bf(self):
+        """build + flashserial"""
+        self.build()
+        self.flashserial()
 
 
-    def http_post(self, page, params,  data=None, twice=False):
+    def http_post(self, page, params=None,  data=None, twice=False):
         """http post to espeasy webinterface. (GET if data is None)"""
 
         # transform easy copy/pastable chromium data into a dict
 
-        params_dict={}
-        for line in params.split("\n"):
-            m=re.match(" *(.*?):(.*)",line)
-            if (m):
-                params_dict[m.group(1)]=m.group(2)
+        if params:
+            params_dict={}
+            for line in params.split("\n"):
+                m=re.match(" *(.*?):(.*)",line)
+                if (m):
+                    params_dict[m.group(1)]=m.group(2)
+        else:
+            params_dict=None
 
         if data:
             data_dict={}
@@ -196,9 +232,11 @@ class Node():
             data_dict=None
 
 
+        url=self._url+page
+        self.log.debug("HTTP POST {url} with params {params} and data {data}".format(url=url,params=params,data=data))
 
         r=requests.post(
-            self._url+page,
+            url,
             params=params_dict,
             data=data_dict
         )

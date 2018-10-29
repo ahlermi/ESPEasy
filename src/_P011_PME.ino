@@ -1,3 +1,4 @@
+#ifdef USES_P011
 //#######################################################################################################
 //#################################### Plugin 011: Pro Mini Extender ####################################
 //#######################################################################################################
@@ -47,7 +48,7 @@ boolean Plugin_011(byte function, struct EventStruct *event, String& string)
       {
         byte choice = Settings.TaskDevicePluginConfig[event->TaskIndex][0];
         String options[2] = { F("Digital"), F("Analog") };
-        addFormSelector(string, F("Port Type"), F("plugin_011"), 2, options, NULL, choice);
+        addFormSelector(F("Port Type"), F("plugin_011"), 2, options, NULL, choice);
 
         success = true;
         break;
@@ -122,7 +123,7 @@ boolean Plugin_011(byte function, struct EventStruct *event, String& string)
           if (event->Par1 >= 0 && event->Par1 <= 13)
           {
             Plugin_011_Write(event->Par1, event->Par2);
-            setSystemTimer(event->Par3 * 1000, PLUGIN_ID_011, event->Par1, !event->Par2, 0);
+            setPluginTaskTimer(event->Par3 * 1000, PLUGIN_ID_011, event->TaskIndex, event->Par1, !event->Par2);
             setPinState(PLUGIN_ID_011, event->Par1, PIN_MODE_OUTPUT, event->Par2);
             log = String(F("PME  : GPIO ")) + String(event->Par1) + String(F(" Pulse set for ")) + String(event->Par3) + String(F(" S"));
             addLog(LOG_LEVEL_INFO, log);
@@ -211,3 +212,4 @@ void Plugin_011_Write(byte Par1, byte Par2)
   Wire.write((Par2 >> 8));
   Wire.endTransmission();
 }
+#endif // USES_P011
